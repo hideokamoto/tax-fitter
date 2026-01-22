@@ -1,5 +1,5 @@
 {
-  "name": "stripe-tax-fitter",
+  "name": "@tax-fitter/stripe",
   "version": "0.0.0",
   "type": "module",
   "exports": {
