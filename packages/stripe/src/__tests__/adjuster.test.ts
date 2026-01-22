@@ -77,6 +77,60 @@ describe('TaxFitter', () => {
       expect(result.finalTotal).toBe(315000);
     });
 
+    it('should handle expanded customer object on invoice', async () => {
+      const mockInvoice = {
+        id: 'in_test123',
+        status: 'draft',
+        subtotal: 1000,
+        customer: {
+          id: 'cus_test123',
+          object: 'customer',
+          email: 'test@example.com',
+        } as Stripe.Customer,
+        currency: 'usd',
+      } as Stripe.Invoice;
+
+      const mockInvoiceItem = {
+        id: 'ii_test123',
+      } as Stripe.InvoiceItem;
+
+      vi.spyOn(mockStripe.invoices, 'retrieve').mockResolvedValue(mockInvoice);
+      vi.spyOn(mockStripe.invoiceItems, 'create').mockResolvedValue(mockInvoiceItem);
+
+      await taxFitter.applyAdjustment({
+        invoiceId: 'in_test123',
+        targetTotal: 1100,
+        taxRate: 0.1,
+      });
+
+      // Verify customer ID was correctly extracted from expanded object
+      expect(mockStripe.invoiceItems.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          customer: 'cus_test123',
+        })
+      );
+    });
+
+    it('should throw error for invoice with missing customer', async () => {
+      const mockInvoice = {
+        id: 'in_test123',
+        status: 'draft',
+        subtotal: 1000,
+        customer: null,
+        currency: 'usd',
+      } as unknown as Stripe.Invoice;
+
+      vi.spyOn(mockStripe.invoices, 'retrieve').mockResolvedValue(mockInvoice);
+
+      await expect(
+        taxFitter.applyAdjustment({
+          invoiceId: 'in_test123',
+          targetTotal: 1100,
+          taxRate: 0.1,
+        })
+      ).rejects.toThrow('Invoice in_test123 has invalid or missing customer');
+    });
+
     it('should use custom description when provided', async () => {
       const mockInvoice = {
         id: 'in_test123',

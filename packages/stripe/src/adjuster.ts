@@ -55,6 +55,18 @@ export class TaxFitter {
       );
     }
 
+    // Extract customer ID (handle both string and expanded object forms)
+    let customerId: string;
+    if (typeof invoice.customer === 'string') {
+      customerId = invoice.customer;
+    } else if (invoice.customer && typeof invoice.customer === 'object' && 'id' in invoice.customer) {
+      customerId = invoice.customer.id;
+    } else {
+      throw new Error(
+        `Invoice ${invoiceId} has invalid or missing customer. Cannot create adjustment.`
+      );
+    }
+
     // Calculate the required adjustment
     const adjustmentResult = calculateAdjustment({
       subtotal,
@@ -73,7 +85,7 @@ export class TaxFitter {
     // Negative amount for discount, positive for surcharge
     const invoiceItem = await this.stripe.invoiceItems.create({
       invoice: invoiceId,
-      customer: invoice.customer as string,
+      customer: customerId,
       amount: -adjustmentResult.discount, // Negative for discount
       currency: invoice.currency,
       description,

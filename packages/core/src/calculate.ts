@@ -78,56 +78,88 @@ export function calculateAdjustment(params: AdjustmentParams): AdjustmentResult 
     };
   }
 
-  // Initial estimate: approximate discount based on difference
-  // We need to account for tax on the discount as well
-  const totalDifference = currentTotal - targetTotal;
-  const initialEstimate = Math.floor(totalDifference / (1 + taxRate));
+  // Helper function to calculate total for a given discount
+  const calculateTotal = (discount: number): number => {
+    const adjustedSub = subtotal - discount;
+    if (adjustedSub < 0) return -1; // Invalid
+    const tax = applyTax(adjustedSub, taxRate, roundMode);
+    return adjustedSub + tax;
+  };
 
-  // Iterative refinement: search for exact discount with 1-yen increments
-  // We'll search in a range around the initial estimate
-  const searchRadius = Math.abs(Math.ceil(totalDifference)) + 100; // Add buffer for edge cases
+  // Binary search for the exact discount
+  // Search range: allow negative discounts (surcharges) up to the full subtotal
+  let minDiscount = -subtotal; // Maximum surcharge (doubles the subtotal)
+  let maxDiscount = subtotal; // Maximum discount (reduces subtotal to 0)
 
-  for (let i = -searchRadius; i <= searchRadius; i++) {
-    const testDiscount = initialEstimate + i;
-    const testSubtotal = subtotal - testDiscount;
-
-    // Skip invalid subtotals
-    if (testSubtotal < 0) continue;
-
-    const testTax = applyTax(testSubtotal, taxRate, roundMode);
-    const testTotal = testSubtotal + testTax;
-
-    if (testTotal === targetTotal) {
-      return {
-        discount: testDiscount,
-        isValid: true,
-        adjustedSubtotal: testSubtotal,
-        taxAmount: testTax,
-        finalTotal: testTotal,
-      };
-    }
-  }
-
-  // If no exact match found, find the closest match
   let bestDiscount = 0;
   let bestDifference = Math.abs(currentTotal - targetTotal);
 
-  for (let i = -searchRadius; i <= searchRadius; i++) {
-    const testDiscount = initialEstimate + i;
-    const testSubtotal = subtotal - testDiscount;
+  // Binary search to narrow down the range
+  while (maxDiscount - minDiscount > 1) {
+    const midDiscount = Math.floor((minDiscount + maxDiscount) / 2);
+    const midTotal = calculateTotal(midDiscount);
 
-    if (testSubtotal < 0) continue;
+    if (midTotal === -1) {
+      // Invalid subtotal, adjust range
+      maxDiscount = midDiscount - 1;
+      continue;
+    }
 
-    const testTax = applyTax(testSubtotal, taxRate, roundMode);
-    const testTotal = testSubtotal + testTax;
-    const difference = Math.abs(testTotal - targetTotal);
+    if (midTotal === targetTotal) {
+      // Exact match found
+      const adjustedSubtotal = subtotal - midDiscount;
+      const taxAmount = applyTax(adjustedSubtotal, taxRate, roundMode);
+      return {
+        discount: midDiscount,
+        isValid: true,
+        adjustedSubtotal,
+        taxAmount,
+        finalTotal: targetTotal,
+      };
+    }
 
+    // Track best match so far
+    const difference = Math.abs(midTotal - targetTotal);
     if (difference < bestDifference) {
       bestDifference = difference;
-      bestDiscount = testDiscount;
+      bestDiscount = midDiscount;
+    }
+
+    // Since total decreases as discount increases (monotonic)
+    if (midTotal > targetTotal) {
+      // Need more discount
+      minDiscount = midDiscount + 1;
+    } else {
+      // Need less discount
+      maxDiscount = midDiscount - 1;
     }
   }
 
+  // Check remaining candidates in the final range
+  for (let discount = minDiscount; discount <= maxDiscount; discount++) {
+    const total = calculateTotal(discount);
+    if (total === -1) continue;
+
+    if (total === targetTotal) {
+      const adjustedSubtotal = subtotal - discount;
+      const taxAmount = applyTax(adjustedSubtotal, taxRate, roundMode);
+      return {
+        discount,
+        isValid: true,
+        adjustedSubtotal,
+        taxAmount,
+        finalTotal: targetTotal,
+      };
+    }
+
+    const difference = Math.abs(total - targetTotal);
+    if (difference < bestDifference) {
+      bestDifference = difference;
+      bestDiscount = discount;
+    }
+  }
+
+  // Return best match found
   const adjustedSubtotal = subtotal - bestDiscount;
   const taxAmount = applyTax(adjustedSubtotal, taxRate, roundMode);
   const finalTotal = adjustedSubtotal + taxAmount;
