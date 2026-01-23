@@ -69,7 +69,7 @@ Basic usage for calculating tax adjustments:
 import { calculateAdjustment } from '@tax-fitter/core';
 
 const result = calculateAdjustment({
-  subtotal: 290000,      // Current subtotal (in smallest currency unit, e.g., cents)
+  subtotal: 290000,      // Current subtotal (in smallest currency unit - for JPY: yen, for USD: cents)
   targetTotal: 315000,   // Desired total including tax
   taxRate: 0.1,          // 10% tax rate
   roundMode: 'floor',    // How to round tax amounts
@@ -77,10 +77,10 @@ const result = calculateAdjustment({
 
 console.log(result);
 // {
-//   discount: 4546,              // Amount to discount
+//   discount: 3636,              // Amount to discount
 //   isValid: true,               // Whether calculation succeeded
-//   adjustedSubtotal: 285454,    // Subtotal after discount
-//   taxAmount: 28545,            // Tax on adjusted subtotal
+//   adjustedSubtotal: 286364,    // Subtotal after discount
+//   taxAmount: 28636,            // Tax on adjusted subtotal
 //   finalTotal: 315000,          // Final total (matches target!)
 // }
 ```
@@ -95,23 +95,23 @@ const floor = calculateAdjustment({
   subtotal: 1000,
   targetTotal: 1100,
   taxRate: 0.1,
-  roundMode: 'floor',  // Tax: 100 * 0.1 = 10.0 → 10
+  roundMode: 'floor',  // Rounds tax down: floor(100) = 100
 });
 
 // Ceiling rounding
 const ceil = calculateAdjustment({
-  subtotal: 1001,
+  subtotal: 1000,
   targetTotal: 1100,
   taxRate: 0.1,
-  roundMode: 'ceil',   // Tax: 100.1 * 0.1 = 10.01 → 11
+  roundMode: 'ceil',   // Rounds tax up: ceil(100) = 100
 });
 
 // Standard rounding
 const round = calculateAdjustment({
-  subtotal: 1005,
+  subtotal: 1000,
   targetTotal: 1100,
   taxRate: 0.1,
-  roundMode: 'round',  // Tax: 100.5 * 0.1 = 10.05 → 10
+  roundMode: 'round',  // Rounds tax to nearest: round(100) = 100
 });
 ```
 
@@ -150,7 +150,7 @@ const fitter = new TaxFitter(stripe);
 // Apply adjustment to a draft invoice
 const result = await fitter.applyAdjustment({
   invoiceId: 'in_1234567890',
-  targetTotal: 315000,        // Target amount in cents
+  targetTotal: 315000,        // Target amount in smallest currency unit
   taxRate: 0.1,               // 10% tax
   roundMode: 'floor',
   description: 'Price adjustment',
@@ -162,9 +162,9 @@ const result = await fitter.applyAdjustment({
 console.log(result);
 // {
 //   invoiceItem: { ... },      // Created Stripe invoice item
-//   discount: 4546,            // Calculated discount
-//   adjustedSubtotal: 285454,  // New subtotal
-//   taxAmount: 28545,          // Tax amount
+//   discount: 3636,            // Calculated discount
+//   adjustedSubtotal: 286364,  // New subtotal
+//   taxAmount: 28636,          // Tax amount
 //   finalTotal: 315000,        // Final total
 // }
 ```
@@ -251,7 +251,7 @@ Applies a tax adjustment to a Stripe invoice.
 ```typescript
 interface StripeAdjustmentOptions {
   invoiceId: string;         // Stripe invoice ID
-  targetTotal: number;       // Target total (in cents)
+  targetTotal: number;       // Target total (in smallest currency unit)
   taxRate: number;           // Tax rate as decimal
   roundMode?: RoundMode;     // Rounding mode (default: 'floor')
   description?: string;      // Line item description
@@ -276,9 +276,15 @@ interface StripeAdjustmentResult {
 - Error if invoice has zero subtotal
 - Error if adjustment calculation fails
 
-#### `applyStripeAdjustment(stripe: Stripe, options: StripeAdjustmentOptions)`
+#### `applyStripeAdjustment(stripe: Stripe, options: StripeAdjustmentOptions): Promise<StripeAdjustmentResult>`
 
 Functional interface for applying adjustments.
+
+**Parameters:**
+- `stripe`: Stripe instance
+- `options`: Same as `TaxFitter.applyAdjustment()` options (see [StripeAdjustmentOptions](#applyadjustmentoptions-stripeadjustmentoptions-promisestripeadjustmentresult))
+
+**Returns:** Promise resolving to `StripeAdjustmentResult`
 
 ## Use Cases
 
@@ -304,7 +310,7 @@ Match specific monthly billing amounts:
 ```typescript
 const result = await fitter.applyAdjustment({
   invoiceId: subscription.latest_invoice,
-  targetTotal: 50000,  // ¥500.00
+  targetTotal: 50000,  // ¥50,000 (or $500.00 in cents)
   taxRate: 0.1,
   description: 'Subscription tier adjustment',
 });

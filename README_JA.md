@@ -69,7 +69,7 @@ yarn add stripe-tax-fitter stripe
 import { calculateAdjustment } from '@tax-fitter/core';
 
 const result = calculateAdjustment({
-  subtotal: 290000,      // 現在の小計（最小通貨単位、例: 円、セント）
+  subtotal: 290000,      // 現在の小計（最小通貨単位 - 日本円: 円、米ドル: セント）
   targetTotal: 315000,   // 目標の税込合計
   taxRate: 0.1,          // 10%の税率
   roundMode: 'floor',    // 税額の端数処理方法
@@ -77,10 +77,10 @@ const result = calculateAdjustment({
 
 console.log(result);
 // {
-//   discount: 4546,              // 割引額
+//   discount: 3636,              // 割引額
 //   isValid: true,               // 計算が成功したか
-//   adjustedSubtotal: 285454,    // 割引後の小計
-//   taxAmount: 28545,            // 調整後の小計に対する税額
+//   adjustedSubtotal: 286364,    // 割引後の小計
+//   taxAmount: 28636,            // 調整後の小計に対する税額
 //   finalTotal: 315000,          // 最終合計（目標と一致！）
 // }
 ```
@@ -95,23 +95,23 @@ const floor = calculateAdjustment({
   subtotal: 1000,
   targetTotal: 1100,
   taxRate: 0.1,
-  roundMode: 'floor',  // 税額: 100 * 0.1 = 10.0 → 10
+  roundMode: 'floor',  // 税額を切り捨て: floor(100) = 100
 });
 
 // 切り上げ
 const ceil = calculateAdjustment({
-  subtotal: 1001,
+  subtotal: 1000,
   targetTotal: 1100,
   taxRate: 0.1,
-  roundMode: 'ceil',   // 税額: 100.1 * 0.1 = 10.01 → 11
+  roundMode: 'ceil',   // 税額を切り上げ: ceil(100) = 100
 });
 
 // 四捨五入
 const round = calculateAdjustment({
-  subtotal: 1005,
+  subtotal: 1000,
   targetTotal: 1100,
   taxRate: 0.1,
-  roundMode: 'round',  // 税額: 100.5 * 0.1 = 10.05 → 10
+  roundMode: 'round',  // 税額を四捨五入: round(100) = 100
 });
 ```
 
@@ -150,7 +150,7 @@ const fitter = new TaxFitter(stripe);
 // 下書き請求書に調整を適用
 const result = await fitter.applyAdjustment({
   invoiceId: 'in_1234567890',
-  targetTotal: 315000,        // 目標金額（セント単位）
+  targetTotal: 315000,        // 目標金額（最小通貨単位）
   taxRate: 0.1,               // 10%の税率
   roundMode: 'floor',
   description: '価格調整',
@@ -162,9 +162,9 @@ const result = await fitter.applyAdjustment({
 console.log(result);
 // {
 //   invoiceItem: { ... },      // 作成されたStripe請求項目
-//   discount: 4546,            // 計算された割引額
-//   adjustedSubtotal: 285454,  // 新しい小計
-//   taxAmount: 28545,          // 税額
+//   discount: 3636,            // 計算された割引額
+//   adjustedSubtotal: 286364,  // 新しい小計
+//   taxAmount: 28636,          // 税額
 //   finalTotal: 315000,        // 最終合計
 // }
 ```
@@ -251,7 +251,7 @@ Stripe請求書に税金調整を適用します。
 ```typescript
 interface StripeAdjustmentOptions {
   invoiceId: string;         // Stripe請求書ID
-  targetTotal: number;       // 目標合計（セント単位）
+  targetTotal: number;       // 目標合計（最小通貨単位）
   taxRate: number;           // 小数での税率
   roundMode?: RoundMode;     // 端数処理モード（デフォルト: 'floor'）
   description?: string;      // 明細行の説明
@@ -276,9 +276,15 @@ interface StripeAdjustmentResult {
 - 請求書の小計がゼロの場合、エラーをスロー
 - 調整計算が失敗した場合、エラーをスロー
 
-#### `applyStripeAdjustment(stripe: Stripe, options: StripeAdjustmentOptions)`
+#### `applyStripeAdjustment(stripe: Stripe, options: StripeAdjustmentOptions): Promise<StripeAdjustmentResult>`
 
 調整を適用する関数型インターフェース。
+
+**パラメータ:**
+- `stripe`: Stripeインスタンス
+- `options`: `TaxFitter.applyAdjustment()`と同じオプション（[StripeAdjustmentOptions](#applyadjustmentoptions-stripeadjustmentoptions-promisestripeadjustmentresult)を参照）
+
+**戻り値:** `StripeAdjustmentResult`を解決するPromise
 
 ## ユースケース
 
@@ -304,7 +310,7 @@ const result = calculateAdjustment({
 ```typescript
 const result = await fitter.applyAdjustment({
   invoiceId: subscription.latest_invoice,
-  targetTotal: 50000,  // ¥500.00
+  targetTotal: 50000,  // ¥50,000（または米ドルの場合$500.00のセント単位）
   taxRate: 0.1,
   description: 'サブスクリプションティア調整',
 });
