@@ -388,7 +388,7 @@ pnpm clean
 
 ### Project Structure
 
-```
+```text
 tax-fitter/
 ├── packages/
 │   ├── core/              # @tax-fitter/core

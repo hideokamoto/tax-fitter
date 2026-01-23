@@ -388,7 +388,7 @@ pnpm clean
 
 ### プロジェクト構造
 
-```
+```text
 tax-fitter/
 ├── packages/
 │   ├── core/              # @tax-fitter/core
